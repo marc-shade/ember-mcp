@@ -36,7 +36,10 @@ const LEARNING_LOG = join(homedir(), '.claude', 'pets', 'ember-learning.jsonl');
 const SESSION_CONTEXT_FILE = join(homedir(), '.claude', 'pets', 'ember-session-context.json');
 
 // Groq Configuration
-const GROQ_API_KEY = process.env.GROQ_API_KEY || 'YOUR_GROQ_API_KEY';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+if (!GROQ_API_KEY) {
+  console.warn('Warning: GROQ_API_KEY not set. Ember intelligence features will be limited.');
+}
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 
 // Model selection - GPT-OSS 120B (largest on Groq, exceptional performance)
@@ -158,7 +161,7 @@ const ENHANCED_VIOLATION_PATTERNS: ViolationPattern[] = [
     suggestion: 'Create utility in project directory instead',
     risk: 'Hooks execute on every tool use - bugs could break system',
     impact: 'Could crash Claude Code or create infinite loops',
-    safeAlternative: 'Use /Volumes/SSDRAID0/.../intelligent-self-healing/ or /tools/'
+    safeAlternative: 'Use ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/.../intelligent-self-healing/ or /tools/'
   }
 ];
 

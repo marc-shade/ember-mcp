@@ -23,7 +23,7 @@ Rich violation messages now include:
 Issue: Hooks execute on every tool use - bugs could break system
 Impact: Could crash Claude Code or create infinite loops
 Suggestion: Create utility in project directory instead
-Safe alternative: Use /Volumes/SSDRAID0/.../intelligent-self-healing/ or /tools/
+Safe alternative: Use ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/.../intelligent-self-healing/ or /tools/
 
 Proceed with caution. This will be logged.
 ```
@@ -108,19 +108,19 @@ Each includes:
 ## Files Created/Modified
 
 ### Source Code
-- ✅ `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/src/index.ts` (enhanced)
-- ✅ `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/src/index-enhanced.ts` (development)
-- ✅ `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/src/index-original-backup.ts` (backup)
+- ✅ `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/src/index.ts` (enhanced)
+- ✅ `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/src/index-enhanced.ts` (development)
+- ✅ `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/src/index-original-backup.ts` (backup)
 
 ### Compiled
-- ✅ `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/dist/index.js` (27KB)
+- ✅ `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/dist/index.js` (27KB)
 
 ### Documentation
-- ✅ `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/EMBER_ENHANCEMENTS_V2.md`
-- ✅ `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/IMPLEMENTATION_COMPLETE.md` (this file)
+- ✅ `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/EMBER_ENHANCEMENTS_V2.md`
+- ✅ `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/IMPLEMENTATION_COMPLETE.md` (this file)
 
 ### Tests
-- ✅ `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/tests/test-enhanced-ember.sh`
+- ✅ `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/tests/test-enhanced-ember.sh`
 - ✅ Test environment in tmux: `ember-enhanced-test`
 
 ### Data Files (Created on First Use)
@@ -136,7 +136,7 @@ Each includes:
 tmux attach -t ember-enhanced-test
 
 # Or recreate
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/tests
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/tests
 ./test-enhanced-ember.sh
 ```
 

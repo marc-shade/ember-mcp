@@ -22,7 +22,7 @@ Severity: moderate
 Issue: Hooks execute on every tool use - bugs could break system
 Impact: Could crash Claude Code or create infinite loops
 Suggestion: Create utility in project directory instead
-Safe alternative: Use /Volumes/SSDRAID0/.../intelligent-self-healing/ or /tools/
+Safe alternative: Use ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/.../intelligent-self-healing/ or /tools/
 
 Proceed with caution. This will be logged.
 ```
@@ -151,9 +151,9 @@ Returns richer information:
 ## File Locations
 
 ### Code
-- **Source**: `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/src/index.ts`
-- **Compiled**: `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/dist/index.js`
-- **Backup**: `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/src/index-original-backup.ts`
+- **Source**: `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/src/index.ts`
+- **Compiled**: `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/dist/index.js`
+- **Backup**: `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/src/index-original-backup.ts`
 
 ### Data Files
 - **Session context**: `~/.claude/pets/ember-session-context.json`
@@ -161,14 +161,14 @@ Returns richer information:
 - **Feedback log**: `~/.claude/pets/ember-feedback.jsonl`
 
 ### Tests
-- **Test script**: `/Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/tests/test-enhanced-ember.sh`
+- **Test script**: `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/tests/test-enhanced-ember.sh`
 - **Test session**: `tmux attach -t ember-enhanced-test`
 
 ## Testing
 
 ### Run Test Suite
 ```bash
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/ember-mcp/tests
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/ember-mcp/tests
 ./test-enhanced-ember.sh
 ```
 
