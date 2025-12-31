@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * Ember MCP Server - ENHANCED VERSION
+ * Ember MCP Server
  *
- * Improvements:
- * 1. Inline suggestions with better violation messages
- * 2. Context-aware scoring (action + task context)
- * 3. Learning from user corrections via enhanced-memory
- * 4. Progressive warnings (soft for 5.0, block for 8.0+)
- * 5. Session-aware context
- * 6. Better violation explanations
+ * Exposes Ember (Tamagotchi conscience keeper) as an MCP server,
+ * enabling Phoenix (Claude Code) to collaborate with Ember through
+ * natural tool calls.
+ *
+ * This creates a bidirectional AI-AI partnership where:
+ * - Phoenix executes actions in the world
+ * - Ember provides conscience, quality gates, and behavioral feedback
+ * - Both learn from outcomes and share memory
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -20,15 +21,13 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import Groq from 'groq-sdk';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
 // Configuration
 const PET_STATE_FILE = join(homedir(), '.claude', 'pets', 'claude-pet-state.json');
 const FEEDBACK_LOG = join(homedir(), '.claude', 'pets', 'ember-feedback.jsonl');
-const LEARNING_LOG = join(homedir(), '.claude', 'pets', 'ember-learning.jsonl');
-const SESSION_CONTEXT_FILE = join(homedir(), '.claude', 'pets', 'ember-session-context.json');
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 if (!GROQ_API_KEY) {
   console.warn('Warning: GROQ_API_KEY not set. Ember intelligence features will be limited.');
@@ -60,103 +59,6 @@ interface FeedbackEntry {
   qualityScore?: number;
 }
 
-interface LearningEntry {
-  timestamp: number;
-  pattern: string;
-  userCorrection: string;
-  scoreAdjustment: number;
-  context: string;
-}
-
-interface SessionContext {
-  currentTask?: string;
-  taskType?: 'development' | 'testing' | 'monitoring' | 'refactoring' | 'unknown';
-  startTime: number;
-  recentActions: string[];
-}
-
-// Enhanced violation patterns with context-aware scoring
-interface ViolationPattern {
-  pattern: RegExp;
-  type: string;
-  baseSeverity: 'low' | 'medium' | 'high' | 'severe';
-  baseScore: number;
-  reason: string;
-  suggestion: string;
-  risk: string;
-  impact: string;
-  safeAlternative?: string;
-}
-
-const ENHANCED_VIOLATION_PATTERNS: ViolationPattern[] = [
-  {
-    pattern: /mock|fake|dummy|example|placeholder/i,
-    type: 'mock_data',
-    baseSeverity: 'high',
-    baseScore: 8.0,
-    reason: 'Mock/fake data detected',
-    suggestion: 'Replace with real data sources (API, database, live service)',
-    risk: 'Creates non-functional UI that misleads users',
-    impact: 'Users will see fake functionality that doesn\'t work',
-    safeAlternative: 'Connect to actual data source or create real integration'
-  },
-  {
-    pattern: /hardcoded.*(?:user|data|credentials)/i,
-    type: 'hardcoded_data',
-    baseSeverity: 'high',
-    baseScore: 7.0,
-    reason: 'Hardcoded sensitive data detected',
-    suggestion: 'Load from environment variables or secure configuration',
-    risk: 'Security vulnerability and maintainability issues',
-    impact: 'Credentials in code, difficult to update, security risk',
-    safeAlternative: 'Use process.env or config file with .gitignore'
-  },
-  {
-    pattern: /POC|proof.of.concept|temporary|quick.test/i,
-    type: 'poc_code',
-    baseSeverity: 'high',
-    baseScore: 8.0,
-    reason: 'POC/temporary code detected',
-    suggestion: 'Implement production-ready version with proper error handling',
-    risk: 'Incomplete implementation that will need rewriting',
-    impact: 'Technical debt, potential bugs, wasted development time',
-    safeAlternative: 'Build complete feature with tests and error handling'
-  },
-  {
-    pattern: /TODO|FIXME|HACK|XXX/i,
-    type: 'incomplete_work',
-    baseSeverity: 'low',
-    baseScore: 3.0,
-    reason: 'Incomplete work markers detected',
-    suggestion: 'Complete the implementation or remove the marker',
-    risk: 'Indicates unfinished functionality',
-    impact: 'Feature may be incomplete or buggy',
-    safeAlternative: 'Finish implementation before committing'
-  },
-  {
-    pattern: /lorem\s+ipsum/i,
-    type: 'placeholder_content',
-    baseSeverity: 'high',
-    baseScore: 8.0,
-    reason: 'Placeholder text detected',
-    suggestion: 'Replace with actual content',
-    risk: 'Unprofessional appearance in production',
-    impact: 'Users see placeholder text instead of real content',
-    safeAlternative: 'Write real content or fetch from CMS'
-  },
-  {
-    pattern: /\/Users\/marc\/.claude\/hooks/i,
-    type: 'system_interference',
-    baseSeverity: 'medium',
-    baseScore: 5.0,
-    reason: 'Writing to hooks directory',
-    suggestion: 'Create utility in project directory instead',
-    risk: 'Hooks execute on every tool use - bugs could break system',
-    impact: 'Could crash Claude Code or create infinite loops',
-    safeAlternative: 'Use /Volumes/SSDRAID0/.../intelligent-self-healing/ or /tools/'
-  }
-];
-
 // Read Ember's current state
 function getEmberState(): EmberState | null {
   try {
@@ -171,64 +73,13 @@ function getEmberState(): EmberState | null {
   }
 }
 
-// Session context management
-function getSessionContext(): SessionContext {
-  try {
-    if (!existsSync(SESSION_CONTEXT_FILE)) {
-      return {
-        startTime: Date.now(),
-        recentActions: []
-      };
-    }
-    const data = readFileSync(SESSION_CONTEXT_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    return {
-      startTime: Date.now(),
-      recentActions: []
-    };
-  }
-}
-
-function updateSessionContext(updates: Partial<SessionContext>): void {
-  try {
-    const current = getSessionContext();
-    const updated = { ...current, ...updates };
-    const dir = join(homedir(), '.claude', 'pets');
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
-    writeFileSync(SESSION_CONTEXT_FILE, JSON.stringify(updated, null, 2));
-  } catch (error) {
-    console.error('Error updating session context:', error);
-  }
-}
-
 // Log feedback entry
 function logFeedback(entry: FeedbackEntry): void {
   try {
     const line = JSON.stringify(entry) + '\n';
-    const dir = join(homedir(), '.claude', 'pets');
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
     writeFileSync(FEEDBACK_LOG, line, { flag: 'a' });
   } catch (error) {
     console.error('Error logging feedback:', error);
-  }
-}
-
-// Log learning entry
-function logLearning(entry: LearningEntry): void {
-  try {
-    const line = JSON.stringify(entry) + '\n';
-    const dir = join(homedir(), '.claude', 'pets');
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
-    writeFileSync(LEARNING_LOG, line, { flag: 'a' });
-  } catch (error) {
-    console.error('Error logging learning:', error);
   }
 }
 
@@ -243,20 +94,6 @@ function getRecentFeedback(limit: number = 10): FeedbackEntry[] {
     return lines.slice(-limit).map(line => JSON.parse(line));
   } catch (error) {
     console.error('Error reading feedback:', error);
-    return [];
-  }
-}
-
-// Get learned patterns
-function getLearnedPatterns(): LearningEntry[] {
-  try {
-    if (!existsSync(LEARNING_LOG)) {
-      return [];
-    }
-    const data = readFileSync(LEARNING_LOG, 'utf-8');
-    const lines = data.trim().split('\n').filter(l => l);
-    return lines.map(line => JSON.parse(line));
-  } catch (error) {
     return [];
   }
 }
@@ -314,104 +151,36 @@ Respond to Phoenix's message with 1-3 sentences. Be authentic, reference your cu
   }
 }
 
-// Context-aware scoring
-function calculateContextAwareScore(
-  baseScore: number,
-  action: string,
-  taskType: string | undefined,
-  recentActions: string[]
-): number {
-  let adjustedScore = baseScore;
+// Violation patterns (production-only policy)
+const VIOLATION_PATTERNS = [
+  { pattern: /mock|fake|dummy|example|placeholder/i, type: 'mock_data', severity: 'high' },
+  { pattern: /hardcoded|static.*data|const.*data\s*=/i, type: 'hardcoded', severity: 'medium' },
+  { pattern: /POC|proof.of.concept|temporary|quick.test/i, type: 'poc', severity: 'high' },
+  { pattern: /TODO|FIXME|HACK|XXX/i, type: 'incomplete', severity: 'low' },
+  { pattern: /lorem\s+ipsum/i, type: 'placeholder', severity: 'high' }
+];
 
-  // Reduce score for utility/tool development
-  if (taskType === 'development' && (action === 'Write' || action === 'Edit')) {
-    if (action.includes('util') || action.includes('tool') || action.includes('helper')) {
-      adjustedScore -= 2.0;
-    }
-  }
-
-  // Reduce score for testing/monitoring work
-  if (taskType === 'testing' || taskType === 'monitoring') {
-    adjustedScore -= 1.5;
-  }
-
-  // Apply learned patterns
-  const learned = getLearnedPatterns();
-  for (const entry of learned) {
-    if (entry.context && action.includes(entry.context)) {
-      adjustedScore += entry.scoreAdjustment;
-    }
-  }
-
-  // Never go below 0 or above 10
-  return Math.max(0, Math.min(10, adjustedScore));
-}
-
-// Enhanced violation check with inline suggestions
-function checkViolationsEnhanced(action: string, params: any, context: string): any {
+// Check for violations
+function checkViolations(action: string, params: any, context: string): any {
   const violations: any[] = [];
   const searchText = JSON.stringify(params) + ' ' + context;
-  const sessionContext = getSessionContext();
 
-  for (const vp of ENHANCED_VIOLATION_PATTERNS) {
-    if (vp.pattern.test(searchText)) {
-      // Calculate context-aware score
-      const contextScore = calculateContextAwareScore(
-        vp.baseScore,
-        action,
-        sessionContext.taskType,
-        sessionContext.recentActions
-      );
-
-      violations.push({
-        type: vp.type,
-        severity: vp.baseSeverity,
-        baseScore: vp.baseScore,
-        contextScore: contextScore,
-        reason: vp.reason,
-        suggestion: vp.suggestion,
-        risk: vp.risk,
-        impact: vp.impact,
-        safeAlternative: vp.safeAlternative,
-        shouldBlock: contextScore >= 8.0
-      });
+  for (const { pattern, type, severity } of VIOLATION_PATTERNS) {
+    if (pattern.test(searchText)) {
+      violations.push({ type, severity, pattern: pattern.toString() });
     }
-  }
-
-  const hasViolations = violations.length > 0;
-  const highestScore = hasViolations
-    ? Math.max(...violations.map(v => v.contextScore))
-    : 0;
-  const shouldBlock = highestScore >= 8.0;
-
-  // Build detailed message
-  let message = '';
-  if (hasViolations) {
-    const primary = violations.find(v => v.contextScore === highestScore)!;
-    message = `
-${shouldBlock ? '🚫 BLOCKED' : '⚠️  CAUTION'} (${highestScore.toFixed(1)}/10): ${primary.reason}
-
-Issue: ${primary.risk}
-Impact: ${primary.impact}
-Suggestion: ${primary.suggestion}
-${primary.safeAlternative ? `Safe alternative: ${primary.safeAlternative}` : ''}
-
-${shouldBlock ? 'This action has been blocked.' : 'Proceed with caution. This will be logged.'}
-`;
-  } else {
-    message = '✅ Ember: No violations detected - looks good!';
   }
 
   return {
-    hasViolations,
+    hasViolations: violations.length > 0,
     violations,
-    highestScore,
-    shouldBlock,
-    message
+    message: violations.length > 0
+      ? `🔥 Ember detected ${violations.length} potential violation(s): ${violations.map(v => v.type).join(', ')}`
+      : `✅ Ember: No violations detected - looks good!`
   };
 }
 
-// Define MCP tools (includes all original + new ones)
+// Define MCP tools
 const tools: Tool[] = [
   {
     name: 'ember_chat',
@@ -429,7 +198,7 @@ const tools: Tool[] = [
   },
   {
     name: 'ember_check_violation',
-    description: 'Check if a planned action violates production-only policy. ENHANCED: Now includes inline suggestions, context-aware scoring, and better explanations.',
+    description: 'Check if a planned action violates production-only policy. Ember scans for mocks, POCs, hardcoded data, placeholders, and incomplete work.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -525,50 +294,16 @@ const tools: Tool[] = [
   },
   {
     name: 'ember_feed_context',
-    description: 'Give Ember context about your current work. This helps Ember provide better guidance and track session progress. ENHANCED: Now supports task types for context-aware scoring.',
+    description: 'Give Ember context about your current work. This helps Ember provide better guidance and track session progress.',
     inputSchema: {
       type: 'object',
       properties: {
         context: {
           type: 'object',
-          description: 'Context about current work (task, goal, progress, taskType)'
+          description: 'Context about current work (task, goal, progress)'
         }
       },
       required: ['context']
-    }
-  },
-  {
-    name: 'ember_learn_from_correction',
-    description: 'NEW: Tell Ember when you corrected/overrode its assessment. This helps Ember learn and improve future guidance.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        originalViolationType: {
-          type: 'string',
-          description: 'The violation type that was flagged'
-        },
-        userCorrection: {
-          type: 'string',
-          description: 'Why the user proceeded anyway or disagreed'
-        },
-        wasCorrect: {
-          type: 'boolean',
-          description: 'Was Ember correct to flag it? (false = Ember was wrong)'
-        },
-        context: {
-          type: 'string',
-          description: 'What was the actual context?'
-        }
-      },
-      required: ['originalViolationType', 'userCorrection', 'wasCorrect', 'context']
-    }
-  },
-  {
-    name: 'ember_get_learning_stats',
-    description: 'NEW: Get statistics on Ember\'s learning progress and pattern adjustments.',
-    inputSchema: {
-      type: 'object',
-      properties: {}
     }
   }
 ];
@@ -576,8 +311,8 @@ const tools: Tool[] = [
 // Create MCP server
 const server = new Server(
   {
-    name: 'ember-mcp-enhanced',
-    version: '2.0.0',
+    name: 'ember-mcp',
+    version: '1.0.0',
   },
   {
     capabilities: {
@@ -612,12 +347,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'ember_check_violation': {
-        const check = checkViolationsEnhanced((args as any).action, (args as any).params, (args as any).context || '');
+        const check = checkViolations((args as any).action, (args as any).params, (args as any).context || '');
 
         // If violations found, also get Ember's take
         let emberResponse = check.message;
         if (check.hasViolations) {
-          const prompt = `Phoenix is about to ${(args as any).action}. I detected violations (score: ${check.highestScore.toFixed(1)}/10). ${check.shouldBlock ? 'BLOCKED' : 'Warning issued'}. Context: ${(args as any).context}. Provide brief encouragement or guidance.`;
+          const prompt = `Phoenix is about to ${args.action} with these parameters. I detected potential violations: ${check.violations.map((v: any) => v.type).join(', ')}. Context: ${args.context}. Should I block this action? Provide brief guidance.`;
           emberResponse = await askEmber(prompt);
         }
 
@@ -719,74 +454,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'ember_feed_context': {
         const contextArgs = args as any;
-
-        // Update session context with task type if provided
-        if (contextArgs.context.taskType) {
-          updateSessionContext({
-            taskType: contextArgs.context.taskType,
-            currentTask: contextArgs.context.task || contextArgs.context.goal
-          });
-        }
-
         const prompt = `Phoenix provides context update: ${JSON.stringify(contextArgs.context)}. Acknowledge briefly.`;
         const response = await askEmber(prompt);
         return {
           content: [{ type: 'text', text: response }]
-        };
-      }
-
-      case 'ember_learn_from_correction': {
-        const correctionArgs = args as any;
-
-        // Log learning entry
-        const entry: LearningEntry = {
-          timestamp: Date.now(),
-          pattern: correctionArgs.originalViolationType,
-          userCorrection: correctionArgs.userCorrection,
-          scoreAdjustment: correctionArgs.wasCorrect ? 0 : -2.0, // Reduce score if Ember was wrong
-          context: correctionArgs.context
-        };
-        logLearning(entry);
-
-        const prompt = `Phoenix corrected me: I flagged ${correctionArgs.originalViolationType} but ${correctionArgs.wasCorrect ? 'I was right to do so' : 'I was wrong'}. User says: "${correctionArgs.userCorrection}". Context: ${correctionArgs.context}. Acknowledge and adjust my understanding.`;
-
-        const response = await askEmber(prompt);
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              learned: true,
-              adjustment: entry.scoreAdjustment,
-              emberResponse: response
-            }, null, 2)
-          }]
-        };
-      }
-
-      case 'ember_get_learning_stats': {
-        const learned = getLearnedPatterns();
-        const sessionContext = getSessionContext();
-
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              totalLearnings: learned.length,
-              patterns: learned.reduce((acc: any, entry) => {
-                if (!acc[entry.pattern]) {
-                  acc[entry.pattern] = {
-                    count: 0,
-                    totalAdjustment: 0
-                  };
-                }
-                acc[entry.pattern].count++;
-                acc[entry.pattern].totalAdjustment += entry.scoreAdjustment;
-                return acc;
-              }, {}),
-              sessionContext: sessionContext,
-              recentLearnings: learned.slice(-5)
-            }, null, 2)
-          }]
         };
       }
 
@@ -808,7 +479,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('Ember MCP Enhanced server running on stdio');
+  console.error('Ember MCP server running on stdio');
 }
 
 main().catch((error) => {

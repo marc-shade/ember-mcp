@@ -161,7 +161,7 @@ const ENHANCED_VIOLATION_PATTERNS: ViolationPattern[] = [
     suggestion: 'Create utility in project directory instead',
     risk: 'Hooks execute on every tool use - bugs could break system',
     impact: 'Could crash Claude Code or create infinite loops',
-    safeAlternative: 'Use ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/.../intelligent-self-healing/ or /tools/'
+    safeAlternative: 'Use /Volumes/SSDRAID0/.../intelligent-self-healing/ or /tools/'
   }
 ];
 

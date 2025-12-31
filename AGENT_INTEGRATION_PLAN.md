@@ -113,7 +113,7 @@ async function askEmber(prompt: string): Promise<string> {
 - ✅ No restart needed
 
 **Ember Agent:**
-- ✅ Created at `${HOME}/.claude/agents/ember-personality.md`
+- ✅ Created at `/Users/marc/.claude/agents/ember-personality.md`
 - ⏳ Needs restart to be recognized
 - ⏳ Ready to use via `Task('ember-personality', ...)`
 

@@ -1,13 +1,6 @@
 # Ember MCP
 
-[![MCP](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-[![Part of Agentic System](https://img.shields.io/badge/Part_of-Agentic_System-brightgreen)](https://github.com/marc-shade/agentic-system-oss)
-
-> **MCP server exposing Ember as a collaborative AI partner for Claude Code.**
-
-Part of the [Agentic System](https://github.com/marc-shade/agentic-system-oss) - a 24/7 autonomous AI framework with persistent memory.
+MCP server exposing Ember as a collaborative AI partner for Claude Code.
 
 ## Overview
 
